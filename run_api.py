@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 import os
-from spam_detector import EmailSpamDetector
+from spam_detec import EmailSpamDetector
 
 # Initialize Flask app
 app = Flask(__name__)

@@ -170,20 +170,82 @@ class EmailSpamDetector:
 # Part 2: Application Example - Using the Spam Detector
 
 def load_sample_data():
-    """Load or create sample data for demonstration."""
+    """Load sample data for demonstration."""
+    print("Using sample data for training...")
+    
+    # Extended sample dataset with more examples
+    emails = [
+        # Spam emails
+        "Get rich quick! Claim your prize now!",
+        "Congratulations! You've won $1,000,000 dollars!",
+        "FREE prescription meds at low prices - no prescription needed",
+        "Buy now! Limited time offer 50% off everything",
+        "URGENT: Your account has been suspended - click here immediately",
+        "Viagra at 90% discount! Buy now and save big!",
+        "Double your income working from home! No experience required",
+        "You have been selected for a special offer - act now!",
+        "WINNER! You have won a free iPhone - claim within 24 hours",
+        "Make money fast! Earn $5000 per week from home",
+        "Nigerian Prince needs your help - millions waiting for you",
+        "Free casino bonus - claim your $500 now",
+        "Weight loss miracle - lose 30 pounds in 30 days",
+        "Hot singles in your area want to meet you",
+        "Refinance your mortgage - lowest rates guaranteed",
+        
+        # Legitimate emails
+        "Meeting scheduled for tomorrow at 10am in conference room A",
+        "Please review the attached quarterly report by Friday",
+        "Can we discuss the project status in our 1:1 meeting?",
+        "The quarterly financial results are now available",
+        "Team lunch scheduled for Friday at 12:30pm",
+        "Your password will expire in 7 days - please update it",
+        "New project requirements document has been shared",
+        "Hi, how are you doing? Hope you're having a great week",
+        "The server maintenance is scheduled for this weekend",
+        "Please submit your timesheet by end of day",
+        "Meeting minutes from yesterday's call are attached",
+        "Your order has been shipped and will arrive in 2-3 days",
+        "Thank you for your presentation yesterday",
+        "The new employee handbook is now available online",
+        "System update completed successfully last night"
+    ]
+    
+    # Labels: 1 for spam, 0 for legitimate
+    labels = [
+        # Spam labels (first 15 emails)
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        # Legitimate labels (next 15 emails)
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    ]
+    
+    # Split into train and eval using sklearn
+    from sklearn.model_selection import train_test_split
+    
+    train_texts, eval_texts, train_labels, eval_labels = train_test_split(
+        emails, labels, test_size=0.3, random_state=42, stratify=labels
+    )
+    
+    return train_texts, train_labels, eval_texts, eval_labels
+
+    
+# To use Own Emails dataset:
+    
+def load_custom_data(data_path="your_data.csv"):
+    """Load custom email data from a CSV file."""
     try:
-        # Try to load an existing dataset from Hugging Face
-        dataset = load_dataset("csv", data_files={
-            "train": "https://raw.githubusercontent.com/mohitgupta-omg/Spam-Classification-Dataset/master/spam.csv"
-        })
+        import pandas as pd
+        from sklearn.model_selection import train_test_split
         
-        # Process the dataset
-        train_df = pd.DataFrame(dataset["train"])
-        train_df.columns = ["label", "text"]
-        train_df["label"] = train_df["label"].apply(lambda x: 1 if x == "spam" else 0)
+        # Load the CSV file
+        print(f"Loading data from {data_path}")
+        df = pd.read_csv(data_path)
         
-        # Split into train and eval
-        train_df, eval_df = train_test_split(train_df, test_size=0.2, random_state=42)
+        # Ensure the dataframe has the required columns
+        if 'text' not in df.columns or 'label' not in df.columns:
+            raise ValueError("CSV must contain 'text' and 'label' columns")
+        
+        # Split into train and eval sets
+        train_df, eval_df = train_test_split(df, test_size=0.2, random_state=42)
         
         return (
             train_df["text"].tolist(),
@@ -191,70 +253,10 @@ def load_sample_data():
             eval_df["text"].tolist(),
             eval_df["label"].tolist()
         )
-        
     except Exception as e:
-        print(f"Error loading dataset: {e}")
-        print("Using fallback sample data...")
-        
-        # Create a small synthetic dataset as fallback
-        emails = [
-            "Get rich quick! Claim your prize now!",
-            "Congratulations! You've won $1,000,000",
-            "FREE prescription meds at low prices",
-            "Meeting scheduled for tomorrow at 10am",
-            "Please review the attached report",
-            "Can we discuss the project status?",
-            "Buy now! Limited time offer 50% off",
-            "URGENT: Your account has been suspended",
-            "Hi, how are you doing today?",
-            "The quarterly report is ready for review",
-            "Viagra at 90% discount! Buy now!",
-            "Your password will expire in 24 hours",
-            "New project requirements document",
-            "Double your income working from home!",
-            "Team lunch scheduled for Friday"
-        ]
-        
-        # 1 for spam, 0 for legitimate
-        labels = [1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0]
-        
-        # Split into train and eval
-        from sklearn.model_selection import train_test_split
-        train_texts, eval_texts, train_labels, eval_labels = train_test_split(
-            emails, labels, test_size=0.3, random_state=42
-        )
-        
-        return train_texts, train_labels, eval_texts, eval_labels
-    
-# To use Own Emails dataset:
-    
-# def load_custom_data(data_path="your_data.csv"):
-#     """Load custom email data from a CSV file."""
-#     try:
-#         import pandas as pd
-#         from sklearn.model_selection import train_test_split
-        
-#         # Load the CSV file
-#         print(f"Loading data from {data_path}")
-#         df = pd.read_csv(data_path)
-        
-#         # Ensure the dataframe has the required columns
-#         if 'text' not in df.columns or 'label' not in df.columns:
-#             raise ValueError("CSV must contain 'text' and 'label' columns")
-        
-#         # Split into train and eval sets
-#         train_df, eval_df = train_test_split(df, test_size=0.2, random_state=42)
-        
-#         return (
-#             train_df["text"].tolist(),
-#             train_df["label"].tolist(),
-#             eval_df["text"].tolist(),
-#             eval_df["label"].tolist()
-#         )
-#     except Exception as e:
-#         print(f"Error loading custom data: {e}")
-#         print("Falling back to sample data...")
-#         return load_sample_data()
+        print(f"Error loading custom data: {e}")
+        print("Falling back to sample data...")
+        return load_sample_data()
 
 # # Replace the call to load_sample_data() with load_custom_data() in your scripts
 # # Example: train_texts, train_labels, eval_texts, eval_labels = load_custom_data("my_emails.csv")
