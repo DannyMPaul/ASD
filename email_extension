@@ -1,0 +1,193 @@
+// Gmail Spam Detector Content Script
+// This script runs on Gmail pages to detect spam
+
+class GmailSpamDetector {
+    constructor() {
+        this.apiUrl = 'http://localhost:5001'; // Your API server
+        this.init();
+    }
+    
+    init() {
+        console.log('Gmail Spam Detector initialized');
+        
+        // Wait for Gmail to load
+        this.waitForGmail().then(() => {
+            this.setupEmailObserver();
+            this.checkVisibleEmails();
+        });
+    }
+    
+    waitForGmail() {
+        return new Promise((resolve) => {
+            const checkGmail = () => {
+                if (document.querySelector('[data-thread-id]') || 
+                    document.querySelector('.ii.gt')) {
+                    resolve();
+                } else {
+                    setTimeout(checkGmail, 1000);
+                }
+            };
+            checkGmail();
+        });
+    }
+    
+    setupEmailObserver() {
+        // Observe changes in the email list
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.addedNodes.length > 0) {
+                    setTimeout(() => this.checkVisibleEmails(), 1000);
+                }
+            });
+        });
+        
+        const emailContainer = document.querySelector('#\\:2') || 
+                              document.querySelector('[role="main"]');
+        
+        if (emailContainer) {
+            observer.observe(emailContainer, {
+                childList: true,
+                subtree: true
+            });
+        }
+    }
+    
+    extractEmailContent(emailElement) {
+        try {
+            // Try to extract email content from Gmail's structure
+            const subjectElement = emailElement.querySelector('[data-legacy-thread-id]') ||
+                                 emailElement.querySelector('h2') ||
+                                 emailElement.querySelector('.hP');
+            
+            const bodyElement = emailElement.querySelector('.ii.gt div') ||
+                              emailElement.querySelector('[dir="ltr"]');
+            
+            const senderElement = emailElement.querySelector('.go .g2') ||
+                                emailElement.querySelector('.yW span');
+            
+            const subject = subjectElement ? subjectElement.textContent.trim() : 'No Subject';
+            const body = bodyElement ? bodyElement.textContent.trim() : '';
+            const sender = senderElement ? senderElement.textContent.trim() : 'Unknown';
+            
+            return {
+                subject: subject,
+                body: body,
+                sender: sender,
+                fullContent: `Subject: ${subject}\nFrom: ${sender}\n\n${body}`
+            };
+        } catch (error) {
+            console.error('Error extracting email content:', error);
+            return null;
+        }
+    }
+    
+    async checkEmailSpam(emailContent) {
+        try {
+            const response = await fetch(`${this.apiUrl}/check-email`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email_content: emailContent.body,
+                    subject: emailContent.subject,
+                    sender: emailContent.sender
+                })
+            });
+            
+            if (response.ok) {
+                return await response.json();
+            } else {
+                console.error('API request failed:', response.status);
+                return null;
+            }
+        } catch (error) {
+            console.error('Error calling spam detection API:', error);
+            return null;
+        }
+    }
+    
+    addSpamIndicator(emailElement, spamResult) {
+        // Remove existing indicators
+        const existingIndicator = emailElement.querySelector('.spam-detector-indicator');
+        if (existingIndicator) {
+            existingIndicator.remove();
+        }
+        
+        // Create spam indicator
+        const indicator = document.createElement('div');
+        indicator.className = 'spam-detector-indicator';
+        indicator.style.cssText = `
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            z-index: 1000;
+            ${spamResult.is_spam ? 
+                'background-color: #ff5722; color: white;' : 
+                'background-color: #4caf50; color: white;'
+            }
+        `;
+        
+        indicator.textContent = spamResult.is_spam ? 
+            `🚨 SPAM (${(spamResult.spam_probability * 100).toFixed(1)}%)` : 
+            `✅ SAFE (${((1 - spamResult.spam_probability) * 100).toFixed(1)}%)`;
+        
+        indicator.title = `Spam confidence: ${(spamResult.spam_probability * 100).toFixed(2)}%`;
+        
+        // Make email container relative positioned
+        emailElement.style.position = 'relative';
+        emailElement.appendChild(indicator);
+        
+        // Add background color for spam emails
+        if (spamResult.is_spam) {
+            emailElement.style.backgroundColor = '#ffebee';
+            emailElement.style.borderLeft = '4px solid #ff5722';
+        }
+    }
+    
+    async checkVisibleEmails() {
+        // Find email elements (Gmail's structure can vary)
+        const emailElements = document.querySelectorAll('[data-thread-id], .zA, .ii.gt');
+        
+        for (const emailElement of emailElements) {
+            // Skip if already processed
+            if (emailElement.hasAttribute('data-spam-checked')) {
+                continue;
+            }
+            
+            const emailContent = this.extractEmailContent(emailElement);
+            if (emailContent && emailContent.body.length > 10) {
+                emailElement.setAttribute('data-spam-checked', 'true');
+                
+                // Check for spam
+                const spamResult = await this.checkEmailSpam(emailContent);
+                if (spamResult) {
+                    this.addSpamIndicator(emailElement, spamResult);
+                }
+                
+                // Small delay to avoid overwhelming the API
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
+    }
+}
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        new GmailSpamDetector();
+    });
+} else {
+    new GmailSpamDetector();
+}
+
+// Also initialize when navigating in Gmail (single-page app)
+window.addEventListener('hashchange', () => {
+    setTimeout(() => {
+        new GmailSpamDetector();
+    }, 2000);
+});
